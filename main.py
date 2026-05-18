@@ -1,5 +1,6 @@
 # Required libraries
 import requests
+from letterboxdpy.list import List
 import openai
 from openai import OpenAI
 
@@ -63,8 +64,22 @@ def similar_artists():
 # Storing the similar artists
 similar_artists = similar_artists()
 
-# Storing my top movies
-top_movies = ["T2 Trainspotting - Danny Boyle", "Trainspotting - Danny Boyle", "The Perks of Being a Wallflower - Stephen Chbosky", "The Breakfast Club - John Hughes", "Tunnel Rave - Tony Infante", "500 Days of Summer - Mark Webb", "The Madness of King George - Nicholas Hytner", "Django Unchained - Quentin Tarantino", "Almost Famous - Cameron Crowe", "Nuremberg - James Vaanderbilt", "Spike Island - Mat Whitecross"]
+# Function to access top movies
+def top_movies():
+    # Using letterboxdpy to web scrape movies from my list of favourites
+    list_instance = List("cjc22", "my-favourites")
+    # Lazy scraping
+    list_instance.movies
+    # Saving the movie names to the list
+    top_movies = [
+        movie["name"]
+        for movie in list_instance["_movies"].values()
+    ]
+    # Returning the top movies list
+    return top_movies
+
+# Storting the top movies
+top_movies = top_movies()
 
 # Storing my books
 top_books = ["Open Water - Caleb Azumah Nelson", "We Begin at the End - Chris Whitaker", "Tomorrow, and Tomorrow, and Tomorrow - Gabrielle Zevin"]
