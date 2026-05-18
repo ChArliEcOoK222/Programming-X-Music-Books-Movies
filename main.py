@@ -20,6 +20,21 @@ music_params = {
     "period": "1month"    
 }
 
+# Parameters for GraphQL API for Hardcover
+books_url = "https://api.hardcover.app/v1/graphql"
+query = """
+query {
+  me {
+    user_books(where: {status_id: {_eq: 3}}) {
+      rating
+      book {
+        title
+      }
+    }
+  }
+}
+"""
+
 # Function to access top artists
 def top_artists():
     # Calling the last.fm API with the specific parameters
@@ -81,13 +96,32 @@ def top_movies():
 # Storting the top movies
 top_movies = top_movies()
 
-# Storing my books
-top_books = ["Open Water - Caleb Azumah Nelson", "We Begin at the End - Chris Whitaker", "Tomorrow, and Tomorrow, and Tomorrow - Gabrielle Zevin"]
+# Function to access read books
+def top_books():
+    # Calling the GraphQL API with the specific parameters
+    response = requests.post("https://api.hardcover.app/v1/graphql",
+    headers={
+        "Authorization": f""
+    },
+    json={"query": query}
+    )   
+    # Saving the output as a json
+    result = response.json()
+    # Accessing and saving the book titles
+    titles = [
+        entry["book"]["title"]
+        for entry in result["data"]["me"][0]["user_books"]
+    ]
+    # Saving the titles
+    return titles
+
+# Storing the top books
+top_books = top_books()
 
 # Choice of what to generate
 choice = input("Do you need albums, movies, or books? ").lower()
 
-# Using this to generate output based on user preference
+# Album input is given
 if choice == "albums":
     # Using GPT to match the user's artists, movies and books to new albums
     response = client.chat.completions.create(
@@ -99,8 +133,9 @@ if choice == "albums":
     # Accessing the message content of the output and saving it to a variable
     response_message = response.choices[0].message.content
     print(response_message)
+# Movie input is given
 elif choice == "movies":
-    # Using GPT to match the user's artists, movies and books to new albums
+    # Using GPT to match the user's artists, movies and books to new movies
     response = client.chat.completions.create(
         model="gpt-4.1",
         messages=[{"role": "user", "content": f"Based on the matching themes from the following list of my top 50 artists, my favorite films, and my favorite books match the main themes of all of these with movies. I aim to discover new movies every month. Give me the top 5 movies you recommend for me, based on my taste profile. These movies do not necessarily have to be music-themed too just because I like music. Give me a clear and concise response that consists of nothing but a list of movies: {top_artists}, {top_movies}, {top_books}"}],
@@ -110,3 +145,18 @@ elif choice == "movies":
     # Accessing the message content of the output and saving it to a variable
     response_message = response.choices[0].message.content
     print(response_message)
+# Book input is given
+elif choice == "books":
+    # Using GPT to match the user's artists, movies and books to new books
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": f"Based on the matching themes from the following list of my top 50 artists, my favorite films, and my favorite books match the main themes of all of these with books. I like books which take me on a journey and make me feel alive. Give me the top 5 books you recommend for me, based on my taste profile. These books do not necessarily have to be music-themed too just because I like music. Give me a clear and concise response that consists of nothing but a list of books: {top_artists}, {top_movies}, {top_books}"}],
+        max_tokens=4096,
+        n=1
+    )
+    # Accessing the message content of the output and saving it to a variable
+    response_message = response.choices[0].message.content
+    print(response_message)
+# Invalid input is given
+else:
+    print("Invalid input")
