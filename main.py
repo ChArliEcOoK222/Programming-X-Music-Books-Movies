@@ -1,8 +1,12 @@
+# How can I automatically save each recommendation on the app itself?
+# How can I run this in a bash script?
+
 # Required libraries
 import requests
 from letterboxdpy.list import List
 import openai
 from openai import OpenAI
+import json
 
 # Creating a new OpenAI client from the API key
 client = OpenAI(
@@ -34,6 +38,29 @@ query {
   }
 }
 """
+
+# Parameters for Spotify API
+spotify_url = "https://api.spotify.com/v1/search"
+# Adding spotify auth helpers
+def get_access_token():
+    response = requests.post(
+        "https://accounts.spotify.com/api/token",
+        data={
+            "grant_type": "refresh_token",
+            "refresh_token": "",
+            "client_id": "",
+            "client_secret": "",
+        }
+    )
+
+    return response.json()["access_token"]
+
+# Saving my access token
+access_token = get_access_token()
+
+spotify_headers = {
+    "Authorization": f"Bearer {access_token}"
+}
 
 # Function to access top artists
 def top_artists():
@@ -101,7 +128,7 @@ def top_books():
     # Calling the GraphQL API with the specific parameters
     response = requests.post("https://api.hardcover.app/v1/graphql",
     headers={
-        "Authorization": f""
+        "Authorization": f"Bearer "
     },
     json={"query": query}
     )   
@@ -120,25 +147,35 @@ top_books = top_books()
 
 # Choice of what to generate
 choice = input("Do you need albums, movies, or books? ").lower()
+# Variables to store recommendations
+album_recs = []
 
 # Album input is given
 if choice == "albums":
     # Using GPT to match the user's artists, movies and books to new albums
     response = client.chat.completions.create(
         model="gpt-4.1",
-        messages=[{"role": "user", "content": f"I have used Last FM to find similar artists to my Top 50 artists from the last month. I am providing you with a list of these artists, my favorite films, and my favorite books. Find the best albums by these artists which match the themes of these movies and books. I aim to discover new music every month so give me enough albums to last a month, as I think listening to albums is a dying skill when artists intend you to listen to their albums and not their compilations. Albums tell a story. I am also trying to move away from indie and britpop landfill as I feel that lots of music nowadays just sounds the same, we as a society lack genuinely good music like old times. Give me a clear and concise response that consists of nothing but a list of albums, where each album is from a different artist, no text other than a list of albums please: {similar_artists}, {top_movies}, {top_books}"}],
+        messages=[{"role": "user", "content": f"I have used Last FM to find similar artists to my Top 50 artists from the last month. I am providing you with a list of these artists, my favorite films, and my favorite books. Find the best albums by these artists which match the themes of these movies and books. I aim to discover new music every month so give me enough albums to last a month, as I think listening to albums is a dying skill when artists intend you to listen to their albums and not their compilations. This means around 30 albums, give or take. Albums tell a story. I am also trying to move away from indie and britpop landfill as I feel that lots of music nowadays just sounds the same, we as a society lack genuinely good music like old times. Give me a clear and concise response that consists of nothing but a list of albums, where each album is from a different artist, no text other than a list of albums please. This must be in structured JSON format consisting of attributes artist and album, making downstream API calls much easier: {similar_artists}, {top_movies}, {top_books}"}],
         max_tokens=4096,
         n=1
     )
     # Accessing the message content of the output and saving it to a variable
     response_message = response.choices[0].message.content
-    print(response_message)
+    # Cleaning the output for Spotify API
+    clean = (
+            response_message
+            .replace("```json", "")
+            .replace("```", "")
+            .strip()
+    )
+    album_recs = json.loads(clean)
+
 # Movie input is given
 elif choice == "movies":
     # Using GPT to match the user's artists, movies and books to new movies
     response = client.chat.completions.create(
         model="gpt-4.1",
-        messages=[{"role": "user", "content": f"Based on the matching themes from the following list of my top 50 artists, my favorite films, and my favorite books match the main themes of all of these with movies. I aim to discover new movies every month. Give me the top 5 movies you recommend for me, based on my taste profile. These movies do not necessarily have to be music-themed too just because I like music. Give me a clear and concise response that consists of nothing but a list of movies: {top_artists}, {top_movies}, {top_books}"}],
+        messages=[{"role": "user", "content": f"Based on the matching themes from the following list of my top 50 artists, my favorite films, and my favorite books match the main themes of all of these with movies. I aim to discover new movies every month. Give me the top 5 movies you recommend for me, based on my taste profile. These movies do not necessarily have to be music-themed too just because I like music. I also cannot have already watched them. Give me a clear and concise response that consists of nothing but a list of movies: {top_artists}, {top_movies}, {top_books}"}],
         max_tokens=4096,
         n=1
     )
@@ -160,3 +197,33 @@ elif choice == "books":
 # Invalid input is given
 else:
     print("Invalid input")
+
+# Function to get the IDs of each album
+def get_albumID():
+    # List to store IDs
+    album_ids = []
+    # Iterating over each item in the JSON
+    for rec in album_recs:
+        # Accessing the Spotify API
+        query = f"{rec["album"]} {rec["artist"]}"
+        response = requests.get(
+            spotify_url,
+            headers=spotify_headers,
+            params={
+                "q":query,
+                "type": "album", 
+                "limit": 5
+            }
+        )
+
+        # Saving the output
+        data = response.json()
+        # Saving the IDs
+        items = data["albums"]["items"]
+        album_id = items[0]["id"]
+        album_ids.append(album_id)
+    # Returning the IDs
+    return album_ids
+
+# Storing album IDs
+album_IDs = get_albumID()
