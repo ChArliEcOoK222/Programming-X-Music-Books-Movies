@@ -205,7 +205,7 @@ def get_albumID():
     # Iterating over each item in the JSON
     for rec in album_recs:
         # Accessing the Spotify API
-        query = f"{rec["album"]} {rec["artist"]}"
+        query = f"{rec['album']} {rec['artist']}"
         response = requests.get(
             spotify_url,
             headers=spotify_headers,
@@ -227,3 +227,22 @@ def get_albumID():
 
 # Storing album IDs
 album_IDs = get_albumID()
+
+# Function to save these albums to my library
+def save_album():
+    # Arguments for the API
+    uris = ",".join([f"spotify:album:{i}" for i in album_IDs])
+    url = "https://api.spotify.com/v1/me/library"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    # Calling the API
+    response = requests.put(
+        url,
+        headers=headers,
+        params={"uris": uris}
+    ) 
+
+# Saving the albums
+save_album()
